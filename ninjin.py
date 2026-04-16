@@ -6,17 +6,17 @@ import random
 import csv
 
 
-# 카테고리 추가 
-categories = ["에어팟+4", "에어팟+4+미개봉"]
+# add categories
+categories = ["에어팟+4"]
 
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 }
 
-# 기본적 셋팅
+# basic setting
 links = []
-target_count = 20
+target_count = 100
 csv_attach = []
 
 
@@ -26,8 +26,8 @@ for category in categories:
     if len(links) >= target_count:
         break
     
-    #숫자 랜덤화 하여 동별 검색 참고: 3부터 10000 정도 까지 동 있음.
-    rand_regions = random.sample(range(1,10001), 10)
+    # randomise numbers
+    rand_regions = random.sample(range(1,10001), 20)
 
     for regions in rand_regions:
         if len(links) >= target_count:
@@ -62,7 +62,7 @@ for category in categories:
         time.sleep(1)
 
 
-#분석 과 파싱
+#analyse and parsing
 for i, url in enumerate(links):
     print(f"arraying {1+i}/{len(links)}th articles: {url}")
 
@@ -71,22 +71,52 @@ for i, url in enumerate(links):
         article_res.encoding = "utf-8"
         article_soup = BeautifulSoup(article_res.text, 'html.parser')
 
-        title = article_soup.find('h1').get_text(strip=True) if article_soup.find('h1') else "None"
+        #crawling title
+        title_el = article_soup.find('h1').get_text(strip=True) if article_soup.find('h1') else "None"
+        title_check = title_el.lower().replace(" ", "")
+        if "에어팟4" not in title_check and "airpod4" not in title_check and "airpods4" not in title_check:
+            continue
 
+        title = title_check
+
+        #crawling contents
         paragraphs = article_soup.find_all('p')
-        content = "\n".join([p.get_text(strip=True) for p in paragraphs[:1]])
+        content = "\n".join([p.get_text(strip=True) for p in paragraphs])
         
         chat_info = article_soup.select_one('span._1pwsqmm0._1pwsqmm2').get_text(strip= True)
 
+        #crawling price
         price = article_soup.select_one('h3').get_text(strip=True)
         price_info = re.sub(r'[^0-9]', '', price)
 
+        #crawling heart, interest, view
         items = re.split(r'·', chat_info)
         pure_chat = [re.sub(r'[^0-9]', '', i) for i in items]
 
+        #crawling temperature
         temp_el = article_soup.select_one('span.yzp7msi.yzp7msp')
         temp_pure = temp_el.get_text(strip=True) if temp_el else "36.5"
         temp = re.sub(r'[^0-9.]', '', temp_pure)
+
+        #crawling date
+        update_date_el = article_soup.select_one('h2 time')
+        update_raw = update_date_el["datetime"]
+
+        #crwaling seller name
+        seller = article_soup.select_one('.r4hjxee').get_text(strip=True)
+
+        #crawling region
+        region = article_soup.select_one('a.r4hjxer').get_text(strip=True)
+
+        #crawling selling status
+        sold_el = article_soup.select_one('span._4y5lbr5')
+        sold = sold_el.get_text(strip=True) if sold_el else "판매중"
+
+        #crawling image number
+        image = article_soup.find_all('img', class_= '_1wus0xp0')
+        image_count = len(image)
+
+
 
 
 
@@ -98,7 +128,12 @@ for i, url in enumerate(links):
             "view" : pure_chat[2],
             "price" : price_info,
             "temperature" : temp,
-            "url" : url
+            "date" : update_raw[:10],
+            "url" : url,
+            "seller" : seller,
+            "sold" : sold , 
+            "region" : region,
+            "image" : image_count
         }
 
         csv_attach.append(csv_export)
@@ -111,7 +146,7 @@ for i, url in enumerate(links):
 
 filename = "ninjin.csv"
 with open(filename, mode='w', newline='', encoding='utf-8-sig') as file:
-    writer = csv.DictWriter(file, fieldnames=['title' , 'content', 'heart', 'interest', 'view', 'price', 'temperature', 'url'])
+    writer = csv.DictWriter(file, fieldnames=['date', 'title' , 'content', 'heart', 'interest', 'view', 'price', 'temperature', 'seller', 'sold' , 'image', 'region', 'url'])
     writer.writeheader()
     for csv_writing in csv_attach:
         writer.writerow(csv_writing)
